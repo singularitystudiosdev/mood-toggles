@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mood Toggles</title>
+  <style>
+    /* Values traced to design-tokens/dist/tokens.css: --duration-*, --ease-*, --spring-*, --radius-* */
+    :root {
+      --bg: #f4f4f2;
+      --surface: #ffffff;
+      --fg: #1a1a1a;
+      --muted: #6b6b6b;
+      --border: #e2e2de;
+      --accent: #f5a623;
+
+      --radius-card: 12px;
+      --radius-pill: 9999px;
+
+      --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+      --ease-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+      --ease-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+      --spring-spatial: 350ms cubic-bezier(0.27, 1.06, 0.18, 1);
+
+      --d-fast: 150ms;
+      --d-open: 350ms;
+      --d-item: 300ms;
+      --d-close: 200ms;
+      --stagger: 60ms;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      width: min(100% - 32px, 360px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 16px;
+    }
+
+    /* Disclosure button */
+    .disclosure {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 48px;
+      padding: 0 16px;
+      font: inherit;
+      font-weight: 600;
+      color: var(--fg);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: background-color var(--d-fast) var(--ease-standard),
+                  border-color var(--d-fast) var(--ease-standard);
+    }
+    .disclosure:hover { background: var(--bg); }
+    .disclosure:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .disclosure__chevron {
+      width: 20px;
+      height: 20px;
+      transition: transform var(--d-open) var(--ease-standard);
+    }
+    .disclosure[aria-expanded="true"] .disclosure__chevron { transform: rotate(180deg); }
+
+    /*
+      Frame: animates height 0 -> auto via grid-template-rows 0fr -> 1fr.
+      The content keeps its natural size and is clipped, never squashed.
+    */
+    .frame {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows var(--d-open) var(--ease-standard);
+    }
+    .frame[data-open="true"] { grid-template-rows: 1fr; }
+    .frame__clip {
+      min-height: 0;
+      overflow: hidden;
+    }
+    .frame__content {
+      display: grid;
+      gap: 8px;
+      padding-top: 12px;
+    }
+
+    /* Mood toggles: fade in + slide up, staggered */
+    .mood {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 56px;
+      padding: 0 12px 0 16px;
+      font: inherit;
+      color: var(--fg);
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity var(--d-close) var(--ease-accelerate),
+                  transform var(--d-close) var(--ease-accelerate),
+                  border-color var(--d-fast) var(--ease-standard);
+    }
+    .frame[data-open="true"] .mood {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity var(--d-item) var(--ease-decelerate) calc(var(--i) * var(--stagger)),
+                  transform var(--d-item) var(--ease-decelerate) calc(var(--i) * var(--stagger)),
+                  border-color var(--d-fast) var(--ease-standard);
+    }
+    .mood:hover { border-color: var(--muted); }
+    .mood:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .mood[aria-checked="true"] { border-color: var(--accent); }
+
+    .mood__emoji {
+      font-size: 28px;
+      line-height: 1;
+      width: 32px;
+      text-align: center;
+      transition: transform var(--spring-spatial);
+    }
+    .mood[aria-checked="true"] .mood__emoji { transform: scale(1.15); }
+
+    .mood__label {
+      flex: 1;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    /* Switch track + knob */
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex: none;
+      background: var(--border);
+      border-radius: var(--radius-pill);
+      transition: background-color var(--d-fast) var(--ease-standard);
+    }
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: var(--surface);
+      border-radius: var(--radius-pill);
+      transition: transform var(--spring-spatial);
+    }
+    .mood[aria-checked="true"] .switch { background: var(--accent); }
+    .mood[aria-checked="true"] .switch::after { transform: translateX(18px); }
+
+    .summary {
+      margin: 12px 0 0;
+      min-height: 24px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .frame, .mood, .mood__emoji, .switch, .switch::after, .disclosure__chevron {
+        transition-duration: 1ms;
+        transition-delay: 0ms;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <button class="disclosure" type="button" aria-expanded="false" aria-controls="mood-frame" id="toggle">
+      <span>Pick a mood</span>
+      <svg class="disclosure__chevron" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+
+    <div class="frame" id="mood-frame" data-open="false">
+      <div class="frame__clip" inert>
+        <div class="frame__content">
+          <button class="mood" type="button" role="switch" aria-checked="false" data-mood="HAPPY" style="--i: 0">
+            <span class="mood__emoji" aria-hidden="true">😊</span>
+            <span class="mood__label">HAPPY</span>
+            <span class="switch" aria-hidden="true"></span>
+          </button>
+          <button class="mood" type="button" role="switch" aria-checked="false" data-mood="SAD" style="--i: 1">
+            <span class="mood__emoji" aria-hidden="true">😢</span>
+            <span class="mood__label">SAD</span>
+            <span class="switch" aria-hidden="true"></span>
+          </button>
+          <button class="mood" type="button" role="switch" aria-checked="false" data-mood="FUNNY" style="--i: 2">
+            <span class="mood__emoji" aria-hidden="true">😂</span>
+            <span class="mood__label">FUNNY</span>
+            <span class="switch" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="summary" id="summary" aria-live="polite">No mood picked yet.</p>
+  </main>
+
+  <script>
+    const toggle = document.getElementById('toggle');
+    const frame = document.getElementById('mood-frame');
+    const clip = frame.querySelector('.frame__clip');
+    const summary = document.getElementById('summary');
+    const moods = Array.from(frame.querySelectorAll('.mood'));
+
+    toggle.addEventListener('click', () => {
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(open));
+      frame.dataset.open = String(open);
+      clip.inert = !open;
+    });
+
+    moods.forEach((mood) => {
+      mood.addEventListener('click', () => {
+        const on = mood.getAttribute('aria-checked') !== 'true';
+        mood.setAttribute('aria-checked', String(on));
+        renderSummary();
+      });
+    });
+
+    function renderSummary() {
+      const picked = moods
+        .filter((m) => m.getAttribute('aria-checked') === 'true')
+        .map((m) => m.dataset.mood);
+      summary.textContent = picked.length ? `Feeling ${picked.join(', ').toLowerCase()}.` : 'No mood picked yet.';
+    }
+  </script>
+</body>
+</html>
